@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:PerfMonitor}",
+            "name": "Debug PerfMonitor",
+            "target": "PerfMonitor",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PerfMonitor"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:PerfMonitor}",
+            "name": "Release PerfMonitor",
+            "target": "PerfMonitor",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PerfMonitor"
+        }
+    ]
+}
