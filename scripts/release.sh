@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="PerfMonitor"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
+
+# Auto-load project .env so callers don't need to run `source .env` manually.
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+APP_NAME="${APP_NAME:-PerfMonitor}"
 VERSION="${VERSION:-0.1.0}"
 BUNDLE_ID="${BUNDLE_ID:-com.yourcompany.perfmonitor}"
 MIN_MACOS_VERSION="${MIN_MACOS_VERSION:-13.0}"
@@ -12,7 +23,6 @@ INSTALLER_SIGN_IDENTITY="${INSTALLER_SIGN_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 NOTARIZE="${NOTARIZE:-0}"
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_DIR="$ROOT_DIR/.build/release"
 APP_DIR="$DIST_DIR/${APP_NAME}.app"
@@ -37,6 +47,7 @@ Options:
 Environment alternatives:
   VERSION, BUNDLE_ID, MIN_MACOS_VERSION, ICON_ICNS_PATH,
   APP_SIGN_IDENTITY, INSTALLER_SIGN_IDENTITY, NOTARY_PROFILE, NOTARIZE=1
+  ENV_FILE (optional custom .env path)
 USAGE
 }
 
@@ -64,6 +75,9 @@ while [[ $# -gt 0 ]]; do
       exit 1 ;;
   esac
 done
+
+# Recompute pkg path in case --version overrides env/default.
+PKG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}.pkg"
 
 if [[ -z "$ICON_ICNS_PATH" && -f "$DEFAULT_ICON_PATH" ]]; then
   ICON_ICNS_PATH="$DEFAULT_ICON_PATH"

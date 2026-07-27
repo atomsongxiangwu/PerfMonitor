@@ -128,6 +128,7 @@ struct MenuContentView: View {
                 launchAtLoginSection
                 historySection
                 configSection
+                quitSection
             }
             .padding(14)
             .frame(width: panelWidth, alignment: .leading)
@@ -231,6 +232,20 @@ struct MenuContentView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+            }
+        }
+    }
+
+    private var quitSection: some View {
+        section("Application") {
+            HStack {
+                Spacer()
+                Button("Quit PerfMonitor") {
+                    quitApplication()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.red)
             }
         }
     }
@@ -381,4 +396,9 @@ struct MenuContentView: View {
     private func restoreApp() {
         NSApp.setActivationPolicy(.accessory)
     }
+
+    private func quitApplication() {
+        NSApplication.shared.terminate(nil)
+    }
+
 }
