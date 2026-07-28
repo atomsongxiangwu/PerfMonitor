@@ -8,6 +8,8 @@ struct ProcessMetricEntry: Identifiable {
     let name: String
     let cpuPercent: Double
     let memoryBytes: UInt64
+
+    var id: Int32 { pid }
 }
 
 // MARK: - Sampler
@@ -86,8 +88,10 @@ final class ProcessSampler {
     }
 
     private func processName(pid: Int32) -> String {
-        var buf = [CChar](repeating: 0, count: Int(PROC_PIDPATHINFO_MAXSIZE))
-        let ret = proc_name(pid, &buf, UInt32(PROC_PIDPATHINFO_MAXSIZE))
+        // PROC_PIDPATHINFO_MAXSIZE = 4 * MAXPATHLEN = 4096; macro is unavailable in Swift
+        let maxSize = 4096
+        var buf = [CChar](repeating: 0, count: maxSize)
+        let ret = proc_name(pid, &buf, UInt32(maxSize))
         if ret > 0, let s = String(cString: buf, encoding: .utf8), !s.isEmpty {
             return s
         }

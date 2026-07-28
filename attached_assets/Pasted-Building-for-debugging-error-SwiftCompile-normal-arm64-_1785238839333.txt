@@ -1,0 +1,53 @@
+Building for debugging...
+error: SwiftCompile normal arm64 /Users/bytedance/code/demo/PerfMonitor/Sources/PerfMonitor/ProcessSampler.swift failed with a nonzero exit code. Command line:     cd /Users/bytedance/code/demo
+    builtin-SwiftPerFileCompile ProcessSampler.swift
+/Users/bytedance/code/demo/PerfMonitor/Sources/PerfMonitor/ProcessSampler.swift:6:8: error: type 'ProcessMetricEntry' does not conform to protocol 'Identifiable'
+  4 | // MARK: - Model
+  5 | 
+  6 | struct ProcessMetricEntry: Identifiable {
+    |        |- error: type 'ProcessMetricEntry' does not conform to protocol 'Identifiable'
+    |        `- note: add stubs for conformance
+  7 |     let pid: Int32
+  8 |     let name: String
+
+Swift.Identifiable.id:2:12: note: candidate would match if 'ProcessMetricEntry' conformed to 'AnyObject'
+1 | protocol Identifiable {
+2 | public var id: ObjectIdentifier { get }}
+  |            `- note: candidate would match if 'ProcessMetricEntry' conformed to 'AnyObject'
+3 | 
+
+Swift.Identifiable.id:2:5: note: protocol requires property 'id' with type 'ObjectIdentifier'
+1 | protocol Identifiable {
+2 | var id: Self.ID { get }}
+  |     `- note: protocol requires property 'id' with type 'ObjectIdentifier'
+3 | 
+
+/Users/bytedance/code/demo/PerfMonitor/Sources/PerfMonitor/ProcessSampler.swift:89:52: error: cannot find 'PROC_PIDPATHINFO_MAXSIZE' in scope
+ 87 | 
+ 88 |     private func processName(pid: Int32) -> String {
+ 89 |         var buf = [CChar](repeating: 0, count: Int(PROC_PIDPATHINFO_MAXSIZE))
+    |                                                    `- error: cannot find 'PROC_PIDPATHINFO_MAXSIZE' in scope
+ 90 |         let ret = proc_name(pid, &buf, UInt32(PROC_PIDPATHINFO_MAXSIZE))
+ 91 |         if ret > 0, let s = String(cString: buf, encoding: .utf8), !s.isEmpty {
+
+/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sys/proc_info.h:749:9: note: macro 'PROC_PIDPATHINFO_MAXSIZE' unavailable: structure not supported
+747 | #define PROC_PIDPATHINFO                11
+748 | #define PROC_PIDPATHINFO_SIZE           (MAXPATHLEN)
+749 | #define PROC_PIDPATHINFO_MAXSIZE        (4*MAXPATHLEN)
+    |         `- note: macro 'PROC_PIDPATHINFO_MAXSIZE' unavailable: structure not supported
+750 | 
+751 | #define PROC_PIDWORKQUEUEINFO           12
+
+/Users/bytedance/code/demo/PerfMonitor/Sources/PerfMonitor/ProcessSampler.swift:90:47: error: cannot find 'PROC_PIDPATHINFO_MAXSIZE' in scope
+ 88 |     private func processName(pid: Int32) -> String {
+ 89 |         var buf = [CChar](repeating: 0, count: Int(PROC_PIDPATHINFO_MAXSIZE))
+ 90 |         let ret = proc_name(pid, &buf, UInt32(PROC_PIDPATHINFO_MAXSIZE))
+    |                                               `- error: cannot find 'PROC_PIDPATHINFO_MAXSIZE' in scope
+ 91 |         if ret > 0, let s = String(cString: buf, encoding: .utf8), !s.isEmpty {
+ 92 |             return s
+
+/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sys/proc_info.h:749:9: note: macro 'PROC_PIDPATHINFO_MAXSIZE' unavailable: structure not supported
+747 | #define PROC_PIDPATHINFO                11
+748 | #define PROC_PIDPATHINFO_SIZE           (MAXPATHLEN)
+749 | #define PROC_PIDPATHINFO_MAXSIZE        (4*MAXPATHLEN)
+    |         `- note: macro 'PROC_PIDPATHINFO_MAXSIZE' unavailable: structure not supported
