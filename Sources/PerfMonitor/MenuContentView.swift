@@ -9,7 +9,6 @@ struct MenuContentView: View {
     @ObservedObject var viewModel: MetricsViewModel
     @ObservedObject var updaterViewModel: UpdaterViewModel
     @State private var selectedTab: Tab = .monitor
-    @State private var topProcessesExpanded = false
 
     enum Tab: String, CaseIterable {
         case monitor = "Monitor"
@@ -54,71 +53,78 @@ struct MenuContentView: View {
     }
 
     private var monitorTab: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                if viewModel.showCPU {
-                    metricRow(
-                        "CPU",
-                        value: String(format: "%.1f%%", viewModel.snapshot.cpuUsagePercent),
-                        isAlerting: viewModel.isCPUAlerting(for: viewModel.snapshot)
-                    )
-                    trendRow("CPU Trend", values: viewModel.history.map(\.cpuUsagePercent), color: .orange, maxY: 100)
-                }
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if viewModel.showCPU {
+                        metricRow(
+                            "CPU",
+                            value: String(format: "%.1f%%", viewModel.snapshot.cpuUsagePercent),
+                            isAlerting: viewModel.isCPUAlerting(for: viewModel.snapshot)
+                        )
+                        trendRow("CPU Trend", values: viewModel.history.map(\.cpuUsagePercent), color: .orange, maxY: 100)
+                    }
 
-                if viewModel.showMemory {
-                    metricRow(
-                        "Memory",
-                        value: "\(MetricFormatting.bytes(viewModel.snapshot.memoryUsedBytes)) / \(MetricFormatting.bytes(viewModel.snapshot.memoryTotalBytes))",
-                        isAlerting: viewModel.isMemoryAlerting(for: viewModel.snapshot)
-                    )
-                    trendRow("Memory Trend", values: memoryPctTrend, color: .purple, maxY: 100)
-                }
+                    if viewModel.showMemory {
+                        metricRow(
+                            "Memory",
+                            value: "\(MetricFormatting.bytes(viewModel.snapshot.memoryUsedBytes)) / \(MetricFormatting.bytes(viewModel.snapshot.memoryTotalBytes))",
+                            isAlerting: viewModel.isMemoryAlerting(for: viewModel.snapshot)
+                        )
+                        trendRow("Memory Trend", values: memoryPctTrend, color: .purple, maxY: 100)
+                    }
 
-                if viewModel.showNetwork {
-                    metricRow(
-                        "Upload",
-                        value: "\(MetricFormatting.speed(viewModel.snapshot.uploadBytesPerSecond))/s",
-                        isAlerting: viewModel.isUploadAlerting(for: viewModel.snapshot)
-                    )
-                    metricRow(
-                        "Download",
-                        value: "\(MetricFormatting.speed(viewModel.snapshot.downloadBytesPerSecond))/s",
-                        isAlerting: viewModel.isDownloadAlerting(for: viewModel.snapshot)
-                    )
-                    networkTrendRow
-                }
+                    if viewModel.showNetwork {
+                        metricRow(
+                            "Upload",
+                            value: "\(MetricFormatting.speed(viewModel.snapshot.uploadBytesPerSecond))/s",
+                            isAlerting: viewModel.isUploadAlerting(for: viewModel.snapshot)
+                        )
+                        metricRow(
+                            "Download",
+                            value: "\(MetricFormatting.speed(viewModel.snapshot.downloadBytesPerSecond))/s",
+                            isAlerting: viewModel.isDownloadAlerting(for: viewModel.snapshot)
+                        )
+                        networkTrendRow
+                    }
 
-                if viewModel.showDisk {
-                    metricRow(
-                        "Disk Read",
-                        value: "\(MetricFormatting.speed(viewModel.snapshot.diskReadBytesPerSecond))/s",
-                        isAlerting: false
-                    )
-                    metricRow(
-                        "Disk Write",
-                        value: "\(MetricFormatting.speed(viewModel.snapshot.diskWriteBytesPerSecond))/s",
-                        isAlerting: false
-                    )
-                    diskTrendRow
-                }
+                    if viewModel.showDisk {
+                        metricRow(
+                            "Disk Read",
+                            value: "\(MetricFormatting.speed(viewModel.snapshot.diskReadBytesPerSecond))/s",
+                            isAlerting: false
+                        )
+                        metricRow(
+                            "Disk Write",
+                            value: "\(MetricFormatting.speed(viewModel.snapshot.diskWriteBytesPerSecond))/s",
+                            isAlerting: false
+                        )
+                        diskTrendRow
+                    }
 
-                if viewModel.showFPS {
-                    metricRow("FPS", value: MetricFormatting.fps(viewModel.snapshot.fps), isAlerting: false)
-                }
+                    if viewModel.showFPS {
+                        metricRow("FPS", value: MetricFormatting.fps(viewModel.snapshot.fps), isAlerting: false)
+                    }
 
-                topProcessesSection
+                    TopProcessesCard(
+                        processes: viewModel.topProcesses,
+                        sortKey: $viewModel.topProcessSortKey,
+                        memoryTotalBytes: viewModel.snapshot.memoryTotalBytes
+                    )
+                }
+                .padding(14)
+                .frame(width: panelWidth, alignment: .leading)
             }
-            .padding(14)
-            .frame(width: panelWidth, alignment: .leading)
-        }
-        .frame(width: panelWidth, height: panelHeight - 37)
-        .overlay(alignment: .bottomLeading) {
+
+            Divider()
             Text("Updated: \(viewModel.snapshot.sampledAt.formatted(date: .omitted, time: .standard))")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
-                .padding(.bottom, 6)
+                .padding(.vertical, 6)
         }
+        .frame(width: panelWidth, height: panelHeight - 37)
     }
 
     private var settingsTab: some View {
@@ -261,9 +267,13 @@ struct MenuContentView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Check for Updates")
                         .font(.system(size: 12))
-                    Text("Checks GitHub Releases for a newer version")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        updaterViewModel.isUpdaterAvailable
+                            ? "Checks GitHub Releases for a newer version"
+                            : "Unavailable in local debug builds — use a packaged .app"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Check Now") {
@@ -376,102 +386,6 @@ struct MenuContentView: View {
             .frame(height: 28)
             .background(.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
         }
-    }
-
-    // MARK: - Top Processes
-
-    private var topProcessesSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header row — tap to expand/collapse
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    topProcessesExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: topProcessesExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text("Top Processes")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                    Spacer()
-                    // Sort picker — only visible when expanded
-                    if topProcessesExpanded {
-                        Picker("", selection: $viewModel.topProcessSortKey) {
-                            ForEach(ProcessSortKey.allCases) { key in
-                                Text(key.rawValue).tag(key)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 90)
-                        .labelsHidden()
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if topProcessesExpanded {
-                VStack(spacing: 0) {
-                    // Column headers
-                    HStack {
-                        Text("Process")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("CPU%")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 48, alignment: .trailing)
-                        Text("Memory")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 62, alignment: .trailing)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-
-                    Divider()
-
-                    if viewModel.topProcesses.isEmpty {
-                        Text("No data yet…")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                    } else {
-                        ForEach(viewModel.topProcesses) { entry in
-                            processRow(entry)
-                        }
-                    }
-                }
-                .background(.gray.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func processRow(_ entry: ProcessMetricEntry) -> some View {
-        HStack {
-            Text(entry.name)
-                .font(.system(size: 12, design: .monospaced))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(String(format: "%.1f%%", entry.cpuPercent))
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(entry.cpuPercent >= 50 ? .orange : .primary)
-                .frame(width: 48, alignment: .trailing)
-            Text(MetricFormatting.bytes(entry.memoryBytes))
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 62, alignment: .trailing)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        Divider().padding(.leading, 8)
     }
 
     private var diskReadTrend: [Double] { viewModel.history.map(\.diskReadBytesPerSecond) }

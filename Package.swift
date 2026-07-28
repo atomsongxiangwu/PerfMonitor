@@ -16,6 +16,14 @@ let package = Package(
             name: "PerfMonitor",
             dependencies: [
                 .product(name: "Sparkle", package: "Sparkle"),
+            ],
+            // Xcode-beta SPM no longer injects @loader_path; without it,
+            // `swift run` cannot find the adjacent Sparkle.framework.
+            linkerSettings: [
+                .unsafeFlags(
+                    ["-Xlinker", "-rpath", "-Xlinker", "@loader_path"],
+                    .when(platforms: [.macOS])
+                ),
             ]
         ),
     ]
