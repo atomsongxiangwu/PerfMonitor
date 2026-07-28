@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>PerfMonitor Changelog</title>
+        <link>https://raw.githubusercontent.com/atomsongxiangwu/PerfMonitor/main/appcast.xml</link>
+        <description>PerfMonitor release history</description>
+        <language>en</language>
+        <item>
+            <title>Version 0.1.2</title>
+            <sparkle:version>0.1.2</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <pubDate>Tue, 28 Jul 2026 06:51:50 +0000</pubDate>
+            <enclosure
+                url="https://github.com/atomsongxiangwu/PerfMonitor/releases/download/v0.1.2/PerfMonitor-0.1.2.pkg"
+                sparkle:edSignature="PuBOROUXYVziAabyyBkzQJwrMKLG8u5SUHvoX67gqZFaLkT75vecbcLj/xEuLEn4vZKML8XwCuX595gxTWoNDQ=="
+                length="1685845"
+                type="application/octet-stream"/>
+        </item>
+    </channel>
+</rss>
