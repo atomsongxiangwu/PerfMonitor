@@ -12,6 +12,14 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+# GITHUB_TOKEN set in the shell environment (e.g. a work token in ~/.zshrc) blocks
+# gh from using its own stored credentials for the personal account. Unset it here
+# so gh falls back to its keychain/config-file login.
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  echo "==> Unsetting GITHUB_TOKEN (shell env) so gh uses stored personal credentials"
+  unset GITHUB_TOKEN
+fi
+
 APP_NAME="${APP_NAME:-PerfMonitor}"
 VERSION="${VERSION:-0.1.0}"
 BUNDLE_ID="${BUNDLE_ID:-com.yourcompany.perfmonitor}"
