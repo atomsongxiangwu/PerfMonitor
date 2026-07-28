@@ -9,6 +9,7 @@ struct MenuContentView: View {
     @ObservedObject var viewModel: MetricsViewModel
     @ObservedObject var updaterViewModel: UpdaterViewModel
     @State private var selectedTab: Tab = .monitor
+    @State private var topProcessesExpanded = false
 
     enum Tab: String, CaseIterable {
         case monitor = "Monitor"
@@ -104,6 +105,8 @@ struct MenuContentView: View {
                 if viewModel.showFPS {
                     metricRow("FPS", value: MetricFormatting.fps(viewModel.snapshot.fps), isAlerting: false)
                 }
+
+                topProcessesSection
             }
             .padding(14)
             .frame(width: panelWidth, alignment: .leading)
@@ -373,6 +376,102 @@ struct MenuContentView: View {
             .frame(height: 28)
             .background(.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    // MARK: - Top Processes
+
+    private var topProcessesSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Header row — tap to expand/collapse
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    topProcessesExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: topProcessesExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Top Processes")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Spacer()
+                    // Sort picker — only visible when expanded
+                    if topProcessesExpanded {
+                        Picker("", selection: $viewModel.topProcessSortKey) {
+                            ForEach(ProcessSortKey.allCases) { key in
+                                Text(key.rawValue).tag(key)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 90)
+                        .labelsHidden()
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if topProcessesExpanded {
+                VStack(spacing: 0) {
+                    // Column headers
+                    HStack {
+                        Text("Process")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("CPU%")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 48, alignment: .trailing)
+                        Text("Memory")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 62, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+
+                    Divider()
+
+                    if viewModel.topProcesses.isEmpty {
+                        Text("No data yet…")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(viewModel.topProcesses) { entry in
+                            processRow(entry)
+                        }
+                    }
+                }
+                .background(.gray.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func processRow(_ entry: ProcessMetricEntry) -> some View {
+        HStack {
+            Text(entry.name)
+                .font(.system(size: 12, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(String(format: "%.1f%%", entry.cpuPercent))
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(entry.cpuPercent >= 50 ? .orange : .primary)
+                .frame(width: 48, alignment: .trailing)
+            Text(MetricFormatting.bytes(entry.memoryBytes))
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 62, alignment: .trailing)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        Divider().padding(.leading, 8)
     }
 
     private var diskReadTrend: [Double] { viewModel.history.map(\.diskReadBytesPerSecond) }

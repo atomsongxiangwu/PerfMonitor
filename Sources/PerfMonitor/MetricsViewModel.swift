@@ -82,6 +82,7 @@ final class MetricsViewModel: ObservableObject {
     @Published private(set) var snapshot: MetricsSnapshot = .empty
     @Published private(set) var history: [MetricsSnapshot] = []
     @Published private(set) var longHistory: [MetricsSnapshot] = []
+    @Published private(set) var topProcesses: [ProcessMetricEntry] = []
 
     @Published var refreshInterval: RefreshIntervalOption {
         didSet {
@@ -136,7 +137,12 @@ final class MetricsViewModel: ObservableObject {
     @Published var importError: String?
     @Published var historyExportError: String?
 
+    @Published var topProcessSortKey: ProcessSortKey = .cpu {
+        didSet { topProcesses = processSampler.sample(topN: 5, sortBy: topProcessSortKey) }
+    }
+
     private let provider: SystemMetricsProvider
+    private let processSampler = ProcessSampler()
     private let preferencesStore = PreferencesStore()
     private let historyStore = HistoryStore(retentionDays: 7)
     private var ticker: AnyCancellable?
@@ -408,6 +414,7 @@ final class MetricsViewModel: ObservableObject {
         pruneLongHistory(reference: snapshot.sampledAt)
         evaluateAlerts(snapshot: snapshot)
         persistHistory(force: false)
+        topProcesses = processSampler.sample(topN: 5, sortBy: topProcessSortKey)
     }
 
     private func observeTermination() {
