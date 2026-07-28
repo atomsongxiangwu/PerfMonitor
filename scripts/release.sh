@@ -37,6 +37,7 @@ SPARKLE_PRIVATE_KEY_FILE="${SPARKLE_PRIVATE_KEY_FILE:-}"
 SPARKLE_TOOLS_DIR="${SPARKLE_TOOLS_DIR:-}"
 GITHUB_USER="${GITHUB_USER:-}"
 GITHUB_REPO="${GITHUB_REPO:-PerfMonitor}"
+GITHUB_BRANCH="${GITHUB_BRANCH:-master}"
 APPCAST_URL="${APPCAST_URL:-}"
 
 DIST_DIR="$ROOT_DIR/dist"
@@ -64,7 +65,7 @@ Environment alternatives:
   VERSION, BUNDLE_ID, MIN_MACOS_VERSION, ICON_ICNS_PATH,
   APP_SIGN_IDENTITY, INSTALLER_SIGN_IDENTITY, NOTARY_PROFILE, NOTARIZE=1
   SPARKLE_PUBLIC_KEY, SPARKLE_PRIVATE_KEY_FILE, SPARKLE_TOOLS_DIR,
-  GITHUB_USER, GITHUB_REPO, APPCAST_URL
+  GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH, APPCAST_URL
   ENV_FILE (optional custom .env path)
 USAGE
 }
@@ -99,7 +100,7 @@ PKG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}.pkg"
 
 # Derive APPCAST_URL from GitHub info if not explicitly set.
 if [[ -z "$APPCAST_URL" && -n "$GITHUB_USER" ]]; then
-  APPCAST_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/appcast.xml"
+  APPCAST_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/appcast.xml"
 fi
 
 if [[ -z "$ICON_ICNS_PATH" && -f "$DEFAULT_ICON_PATH" ]]; then
@@ -365,7 +366,7 @@ APPCAST
         else
           git commit -m "chore: update appcast for ${RELEASE_TAG}"
           git push
-          echo "    appcast.xml pushed to main branch"
+          echo "    appcast.xml pushed to ${GITHUB_BRANCH} branch"
         fi
       else
         echo ""
