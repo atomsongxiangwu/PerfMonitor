@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import AppKit
 import ServiceManagement
 import UserNotifications
 
@@ -52,7 +53,7 @@ enum HistoryMetric: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct MetricsSnapshot {
+struct MetricsSnapshot: Codable {
     let cpuUsagePercent: Double
     let memoryUsedBytes: UInt64
     let memoryTotalBytes: UInt64
@@ -118,6 +119,7 @@ final class MetricsViewModel: ObservableObject {
 
     @Published var launchAtLoginEnabled = false {
         didSet {
+            persist(launchAtLoginEnabled, forKey: Keys.launchAtLoginEnabled)
             guard launchAtLoginEnabled != oldValue else { return }
             updateLaunchAtLogin()
         }
@@ -127,19 +129,25 @@ final class MetricsViewModel: ObservableObject {
 
     @Published var theme: AppTheme { didSet { persist(theme.rawValue, forKey: Keys.theme) } }
 
-    @Published var overlayEnabled = false
+    @Published var overlayEnabled = false { didSet { persist(overlayEnabled, forKey: Keys.overlayEnabled) } }
     @Published var overlayOpacity: Double { didSet { persist(overlayOpacity, forKey: Keys.overlayOpacity) } }
 
     @Published var historyWindowVisible = false
     @Published var importError: String?
+    @Published var historyExportError: String?
 
     private let provider: SystemMetricsProvider
+    private let preferencesStore = PreferencesStore()
+    private let historyStore = HistoryStore(retentionDays: 7)
     private var ticker: AnyCancellable?
     private let historyLimit: Int
+    private let historyRetentionDays: Int = 7
     private let userDefaults: UserDefaults
     private var previousAlertState: [String: Bool] = [:]
     private var lastNotificationTime: [String: Date] = [:]
     private let notificationCooldown: TimeInterval = 60
+    private var lastPersistedAt: Date = .distantPast
+    private var terminationObserver: NSObjectProtocol?
 
     private enum Keys {
         static let refreshInterval = "refreshInterval"
@@ -156,6 +164,8 @@ final class MetricsViewModel: ObservableObject {
         static let networkAlertThreshold = "networkAlertThresholdMBps"
         static let notificationsEnabled = "notificationsEnabled"
         static let theme = "theme"
+        static let overlayEnabled = "overlayEnabled"
+        static let launchAtLoginEnabled = "launchAtLoginEnabled"
         static let overlayOpacity = "overlayOpacity"
     }
 
@@ -169,24 +179,66 @@ final class MetricsViewModel: ObservableObject {
         self.historyLimit = historyLimit
         self.userDefaults = userDefaults
 
-        let stored = userDefaults.string(forKey: Keys.refreshInterval)
-        refreshInterval = RefreshIntervalOption(rawValue: stored ?? "") ?? defaultRefreshInterval
-        showCPU = userDefaults.object(forKey: Keys.showCPU) as? Bool ?? true
-        showMemory = userDefaults.object(forKey: Keys.showMemory) as? Bool ?? true
-        showNetwork = userDefaults.object(forKey: Keys.showNetwork) as? Bool ?? true
-        showDisk = userDefaults.object(forKey: Keys.showDisk) as? Bool ?? true
-        showFPS = userDefaults.object(forKey: Keys.showFPS) as? Bool ?? true
-        showMenuBarCPU = userDefaults.object(forKey: Keys.showMenuBarCPU) as? Bool ?? true
-        showMenuBarDownload = userDefaults.object(forKey: Keys.showMenuBarDownload) as? Bool ?? true
-        showMenuBarUpload = userDefaults.object(forKey: Keys.showMenuBarUpload) as? Bool ?? false
-        cpuAlertThresholdPercent = userDefaults.object(forKey: Keys.cpuAlertThreshold) as? Double ?? 85
-        memoryAlertThresholdPercent = userDefaults.object(forKey: Keys.memoryAlertThreshold) as? Double ?? 85
-        networkAlertThresholdMBps = userDefaults.object(forKey: Keys.networkAlertThreshold) as? Double ?? 20
-        notificationsEnabled = userDefaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? false
-        theme = AppTheme(rawValue: userDefaults.string(forKey: Keys.theme) ?? "") ?? .system
-        overlayOpacity = userDefaults.object(forKey: Keys.overlayOpacity) as? Double ?? 0.85
+        let persistedSettings = preferencesStore.load()
+        let legacySettings: AppSettings? = {
+            guard userDefaults.object(forKey: Keys.showCPU) != nil ||
+                  userDefaults.object(forKey: Keys.refreshInterval) != nil else {
+                return nil
+            }
 
-        refreshLaunchAtLoginStatus()
+            return AppSettings(
+                refreshInterval: userDefaults.string(forKey: Keys.refreshInterval) ?? RefreshIntervalOption.oneSecond.rawValue,
+                showCPU: userDefaults.object(forKey: Keys.showCPU) as? Bool ?? true,
+                showMemory: userDefaults.object(forKey: Keys.showMemory) as? Bool ?? true,
+                showNetwork: userDefaults.object(forKey: Keys.showNetwork) as? Bool ?? true,
+                showDisk: userDefaults.object(forKey: Keys.showDisk) as? Bool ?? true,
+                showFPS: userDefaults.object(forKey: Keys.showFPS) as? Bool ?? true,
+                showMenuBarCPU: userDefaults.object(forKey: Keys.showMenuBarCPU) as? Bool ?? true,
+                showMenuBarDownload: userDefaults.object(forKey: Keys.showMenuBarDownload) as? Bool ?? true,
+                showMenuBarUpload: userDefaults.object(forKey: Keys.showMenuBarUpload) as? Bool ?? false,
+                cpuAlertThresholdPercent: userDefaults.object(forKey: Keys.cpuAlertThreshold) as? Double ?? 85,
+                memoryAlertThresholdPercent: userDefaults.object(forKey: Keys.memoryAlertThreshold) as? Double ?? 85,
+                networkAlertThresholdMBps: userDefaults.object(forKey: Keys.networkAlertThreshold) as? Double ?? 20,
+                notificationsEnabled: userDefaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? false,
+                theme: userDefaults.string(forKey: Keys.theme) ?? AppTheme.system.rawValue,
+                overlayEnabled: userDefaults.object(forKey: Keys.overlayEnabled) as? Bool ?? false,
+                launchAtLoginEnabled: userDefaults.object(forKey: Keys.launchAtLoginEnabled) as? Bool ?? false,
+                overlayOpacity: userDefaults.object(forKey: Keys.overlayOpacity) as? Double ?? 0.85
+            )
+        }()
+        var settings = persistedSettings ?? legacySettings ?? .default
+        if persistedSettings == nil && legacySettings == nil {
+            settings.refreshInterval = defaultRefreshInterval.rawValue
+        }
+
+        refreshInterval = RefreshIntervalOption(rawValue: settings.refreshInterval) ?? defaultRefreshInterval
+        showCPU = settings.showCPU
+        showMemory = settings.showMemory
+        showNetwork = settings.showNetwork
+        showDisk = settings.showDisk
+        showFPS = settings.showFPS
+        showMenuBarCPU = settings.showMenuBarCPU
+        showMenuBarDownload = settings.showMenuBarDownload
+        showMenuBarUpload = settings.showMenuBarUpload
+        cpuAlertThresholdPercent = settings.cpuAlertThresholdPercent
+        memoryAlertThresholdPercent = settings.memoryAlertThresholdPercent
+        networkAlertThresholdMBps = settings.networkAlertThresholdMBps
+        notificationsEnabled = settings.notificationsEnabled
+        theme = AppTheme(rawValue: settings.theme) ?? .system
+        overlayEnabled = settings.overlayEnabled
+        launchAtLoginEnabled = settings.launchAtLoginEnabled
+        overlayOpacity = settings.overlayOpacity
+
+        if persistedSettings == nil {
+            preferencesStore.save(settings)
+        }
+
+        longHistory = historyStore.load()
+        pruneLongHistory(reference: Date())
+        history = Array(longHistory.suffix(historyLimit))
+
+        reconcileLaunchAtLoginPreference()
+        observeTermination()
         refresh()
         start()
     }
@@ -266,8 +318,35 @@ final class MetricsViewModel: ObservableObject {
         }
     }
 
+    func exportHistoryData(as format: HistoryExportFormat) throws -> Data {
+        try historyStore.export(longHistory, as: format)
+    }
+
     func exportSettings() throws -> Data {
-        let settings = AppSettings(
+        try preferencesStore.exportData(currentPreferences)
+    }
+
+    func importSettings(from data: Data) {
+        do {
+            let settings = try preferencesStore.decode(data)
+            applySettings(settings)
+            importError = nil
+        } catch {
+            importError = "Import failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func applySettings(_ s: AppSettings) {
+        applyPreferences(s)
+        preferencesStore.save(s)
+    }
+
+    private var networkAlertThresholdBytesPerSecond: Double {
+        networkAlertThresholdMBps * 1024 * 1024
+    }
+
+    private var currentPreferences: AppSettings {
+        AppSettings(
             refreshInterval: refreshInterval.rawValue,
             showCPU: showCPU,
             showMemory: showMemory,
@@ -282,24 +361,13 @@ final class MetricsViewModel: ObservableObject {
             networkAlertThresholdMBps: networkAlertThresholdMBps,
             notificationsEnabled: notificationsEnabled,
             theme: theme.rawValue,
+            overlayEnabled: overlayEnabled,
+            launchAtLoginEnabled: launchAtLoginEnabled,
             overlayOpacity: overlayOpacity
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(settings)
     }
 
-    func importSettings(from data: Data) {
-        do {
-            let settings = try JSONDecoder().decode(AppSettings.self, from: data)
-            applySettings(settings)
-            importError = nil
-        } catch {
-            importError = "Import failed: \(error.localizedDescription)"
-        }
-    }
-
-    private func applySettings(_ s: AppSettings) {
+    private func applyPreferences(_ s: AppSettings) {
         refreshInterval = RefreshIntervalOption(rawValue: s.refreshInterval) ?? .oneSecond
         showCPU = s.showCPU
         showMemory = s.showMemory
@@ -314,15 +382,13 @@ final class MetricsViewModel: ObservableObject {
         networkAlertThresholdMBps = s.networkAlertThresholdMBps
         notificationsEnabled = s.notificationsEnabled
         theme = AppTheme(rawValue: s.theme) ?? .system
+        overlayEnabled = s.overlayEnabled
+        launchAtLoginEnabled = s.launchAtLoginEnabled
         overlayOpacity = s.overlayOpacity
     }
 
-    private var networkAlertThresholdBytesPerSecond: Double {
-        networkAlertThresholdMBps * 1024 * 1024
-    }
-
     private func persist(_ value: some Any, forKey key: String) {
-        userDefaults.set(value, forKey: key)
+        preferencesStore.save(currentPreferences)
     }
 
     private func start() {
@@ -341,10 +407,30 @@ final class MetricsViewModel: ObservableObject {
         longHistory.append(snapshot)
         pruneLongHistory(reference: snapshot.sampledAt)
         evaluateAlerts(snapshot: snapshot)
+        persistHistory(force: false)
+    }
+
+    private func observeTermination() {
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.persistHistory(force: true)
+            }
+        }
+    }
+
+    private func persistHistory(force: Bool) {
+        let now = Date()
+        guard force || now.timeIntervalSince(lastPersistedAt) >= 10 else { return }
+        lastPersistedAt = now
+        historyStore.save(longHistory)
     }
 
     private func pruneLongHistory(reference: Date) {
-        let cutoff = reference.addingTimeInterval(-HistoryTimeRange.oneDay.seconds)
+        let cutoff = reference.addingTimeInterval(-TimeInterval(historyRetentionDays * 24 * 3600))
         longHistory.removeAll { $0.sampledAt < cutoff }
     }
 
@@ -410,21 +496,25 @@ final class MetricsViewModel: ObservableObject {
         UNUserNotificationCenter.current().add(request) { _ in }
     }
 
-    private func refreshLaunchAtLoginStatus() {
+    private func reconcileLaunchAtLoginPreference() {
         if #available(macOS 13.0, *) {
             switch SMAppService.mainApp.status {
             case .enabled:
-                launchAtLoginEnabled = true
                 launchAtLoginStatus = .enabled
             case .requiresApproval:
-                launchAtLoginEnabled = true
                 launchAtLoginStatus = .requiresApproval
             default:
-                launchAtLoginEnabled = false
                 launchAtLoginStatus = .disabled
             }
+
+            if launchAtLoginEnabled {
+                if launchAtLoginStatus == .disabled {
+                    updateLaunchAtLogin()
+                }
+            } else if launchAtLoginStatus != .disabled {
+                updateLaunchAtLogin()
+            }
         } else {
-            launchAtLoginEnabled = false
             launchAtLoginStatus = .unsupported
         }
     }

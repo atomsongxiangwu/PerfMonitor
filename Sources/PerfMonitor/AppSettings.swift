@@ -15,6 +15,8 @@ struct AppSettings: Codable {
     var networkAlertThresholdMBps: Double
     var notificationsEnabled: Bool
     var theme: String
+    var overlayEnabled: Bool
+    var launchAtLoginEnabled: Bool
     var overlayOpacity: Double
 
     enum CodingKeys: String, CodingKey {
@@ -32,6 +34,8 @@ struct AppSettings: Codable {
         case networkAlertThresholdMBps
         case notificationsEnabled
         case theme
+        case overlayEnabled
+        case launchAtLoginEnabled
         case overlayOpacity
     }
 
@@ -50,6 +54,8 @@ struct AppSettings: Codable {
         networkAlertThresholdMBps: Double,
         notificationsEnabled: Bool,
         theme: String,
+        overlayEnabled: Bool,
+        launchAtLoginEnabled: Bool,
         overlayOpacity: Double
     ) {
         self.refreshInterval = refreshInterval
@@ -66,6 +72,8 @@ struct AppSettings: Codable {
         self.networkAlertThresholdMBps = networkAlertThresholdMBps
         self.notificationsEnabled = notificationsEnabled
         self.theme = theme
+        self.overlayEnabled = overlayEnabled
+        self.launchAtLoginEnabled = launchAtLoginEnabled
         self.overlayOpacity = overlayOpacity
     }
 
@@ -85,6 +93,30 @@ struct AppSettings: Codable {
         networkAlertThresholdMBps = try c.decodeIfPresent(Double.self, forKey: .networkAlertThresholdMBps) ?? 20
         notificationsEnabled = try c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? false
         theme = try c.decodeIfPresent(String.self, forKey: .theme) ?? AppTheme.system.rawValue
+        overlayEnabled = try c.decodeIfPresent(Bool.self, forKey: .overlayEnabled) ?? false
+        launchAtLoginEnabled = try c.decodeIfPresent(Bool.self, forKey: .launchAtLoginEnabled) ?? false
         overlayOpacity = try c.decodeIfPresent(Double.self, forKey: .overlayOpacity) ?? 0.85
+    }
+
+    static var `default`: AppSettings {
+        AppSettings(
+            refreshInterval: RefreshIntervalOption.oneSecond.rawValue,
+            showCPU: true,
+            showMemory: true,
+            showNetwork: true,
+            showDisk: true,
+            showFPS: true,
+            showMenuBarCPU: true,
+            showMenuBarDownload: true,
+            showMenuBarUpload: false,
+            cpuAlertThresholdPercent: 85,
+            memoryAlertThresholdPercent: 85,
+            networkAlertThresholdMBps: 20,
+            notificationsEnabled: false,
+            theme: AppTheme.system.rawValue,
+            overlayEnabled: false,
+            launchAtLoginEnabled: false,
+            overlayOpacity: 0.85
+        )
     }
 }

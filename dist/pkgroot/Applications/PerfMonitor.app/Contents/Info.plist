@@ -10,6 +10,8 @@
   <key>CFBundleExecutable</key><string>PerfMonitor</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>SUPublicEDKey</key><string>2w796SQLpw2vVD6Ii4ungpnt4gH3eIbaK9sU06bql3s=</string>
+  <key>SUFeedURL</key><string>https://raw.githubusercontent.com/atomsongxiangwu/PerfMonitor/main/appcast.xml</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
 </dict>

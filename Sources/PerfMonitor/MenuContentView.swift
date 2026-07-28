@@ -1,11 +1,13 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 private let panelWidth: CGFloat = 360
 private let panelHeight: CGFloat = 540
 
 struct MenuContentView: View {
     @ObservedObject var viewModel: MetricsViewModel
+    @ObservedObject var updaterViewModel: UpdaterViewModel
     @State private var selectedTab: Tab = .monitor
 
     enum Tab: String, CaseIterable {
@@ -127,6 +129,7 @@ struct MenuContentView: View {
                 thresholdSection
                 launchAtLoginSection
                 historySection
+                updatesSection
                 configSection
                 quitSection
             }
@@ -222,16 +225,50 @@ struct MenuContentView: View {
 
     private var historySection: some View {
         section("History") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Open 1h / 24h trend window")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open") {
+                        viewModel.historyWindowVisible = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                HStack(spacing: 8) {
+                    Button("Export JSON") { exportHistory(.json) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    Button("Export CSV") { exportHistory(.csv) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+                if let err = viewModel.historyExportError {
+                    Text(err).font(.caption2).foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private var updatesSection: some View {
+        section("Updates") {
             HStack {
-                Text("Open 1h / 24h trend window")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Check for Updates")
+                        .font(.system(size: 12))
+                    Text("Checks GitHub Releases for a newer version")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Button("Open") {
-                    viewModel.historyWindowVisible = true
+                Button("Check Now") {
+                    updaterViewModel.checkForUpdates()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .disabled(!updaterViewModel.canCheckForUpdates)
             }
         }
     }
@@ -253,10 +290,10 @@ struct MenuContentView: View {
     private var configSection: some View {
         section("Configuration") {
             HStack(spacing: 10) {
-                Button("Export Config") { exportConfig() }
+                Button("Export Preferences") { exportConfig() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                Button("Import Config") { importConfig() }
+                Button("Import Preferences") { importConfig() }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
@@ -361,9 +398,9 @@ struct MenuContentView: View {
     private func exportConfig() {
         guard let data = try? viewModel.exportSettings() else { return }
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "PerfMonitor-config.json"
+        panel.nameFieldStringValue = "preferences.json"
         panel.allowedContentTypes = [.json]
-        panel.message = "Save PerfMonitor configuration"
+        panel.message = "Save PerfMonitor preferences"
         activateApp()
         panel.begin { response in
             restoreApp()
@@ -378,13 +415,42 @@ struct MenuContentView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = "Select a PerfMonitor configuration file"
+        panel.message = "Select a PerfMonitor preferences file"
         activateApp()
         panel.begin { response in
             restoreApp()
             guard response == .OK, let url = panel.url,
                   let data = try? Data(contentsOf: url) else { return }
             viewModel.importSettings(from: data)
+        }
+    }
+
+    private func exportHistory(_ format: HistoryExportFormat) {
+        do {
+            let data = try viewModel.exportHistoryData(as: format)
+            let panel = NSSavePanel()
+            switch format {
+            case .json:
+                panel.nameFieldStringValue = "PerfMonitor-history.json"
+                panel.allowedContentTypes = [.json]
+            case .csv:
+                panel.nameFieldStringValue = "PerfMonitor-history.csv"
+                panel.allowedContentTypes = [.commaSeparatedText]
+            }
+            panel.message = "Save PerfMonitor history"
+            activateApp()
+            panel.begin { response in
+                restoreApp()
+                guard response == .OK, let url = panel.url else { return }
+                do {
+                    try data.write(to: url, options: .atomic)
+                    viewModel.historyExportError = nil
+                } catch {
+                    viewModel.historyExportError = "Export failed: \(error.localizedDescription)"
+                }
+            }
+        } catch {
+            viewModel.historyExportError = "Export failed: \(error.localizedDescription)"
         }
     }
 

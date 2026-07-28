@@ -114,60 +114,64 @@ swift run
 
 ### 1) 准备 `.env`
 
-`.env` 已创建在项目根目录，填写你的证书与 profile：
+`.env` 已创建在项目根目录，填写你的证书、profile 和 Sparkle 配置：
 
 ```bash
-VERSION="0.1.0"
+VERSION="0.1.2"
 BUNDLE_ID="com.yourcompany.perfmonitor"
 APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 INSTALLER_SIGN_IDENTITY="Developer ID Installer: Your Name (TEAMID)"
 ICON_ICNS_PATH="assets/AppIcon.icns"
 NOTARY_PROFILE="AC_PROFILE"
 NOTARIZE="1"
+
+# Sparkle 自动更新（首次运行 scripts/setup-sparkle.sh 生成后填入）
+SPARKLE_PUBLIC_KEY="..."
+SPARKLE_TOOLS_DIR="/Users/you/.sparkle-tools/bin"
+GITHUB_USER="your_github_username"
+GITHUB_REPO="PerfMonitor"
 ```
 
-### 2) 加载环境变量
+### 2) 执行打包
+
+脚本会**自动读取 `.env`**，直接运行即可，无需手动 `source` 或传参：
 
 ```bash
-cd /Users/bytedance/code/demo/PerfMonitor
-set -a; source .env; set +a
+./scripts/release.sh
 ```
 
-### 3) 执行打包
+脚本会依次完成：编译 → 创建 .app → 嵌入 Sparkle.framework → 签名 → 打 .pkg → 公证 → 生成 appcast.xml。
 
-#### 仅打包（不公证）
+#### 临时覆盖某个参数（可选）
+
+如需临时指定不同的版本号或证书，可用命令行参数覆盖 `.env` 里的值：
 
 ```bash
-./scripts/release.sh \
-  --version "$VERSION" \
-  --bundle-id "$BUNDLE_ID" \
-  --icon-icns "$ICON_ICNS_PATH" \
-  --app-sign "$APP_SIGN_IDENTITY" \
-  --installer-sign "$INSTALLER_SIGN_IDENTITY"
+./scripts/release.sh --version 1.2.0 --notarize
 ```
 
-#### 打包 + 公证（推荐）
+完整参数列表：
 
-```bash
-./scripts/release.sh \
-  --version "$VERSION" \
-  --bundle-id "$BUNDLE_ID" \
-  --icon-icns "$ICON_ICNS_PATH" \
-  --app-sign "$APP_SIGN_IDENTITY" \
-  --installer-sign "$INSTALLER_SIGN_IDENTITY" \
-  --notary-profile "$NOTARY_PROFILE" \
-  --notarize
+```
+--version <ver>              App 版本号
+--bundle-id <id>             Bundle Identifier
+--icon-icns <path>           .icns 图标路径
+--app-sign <identity>        Developer ID Application 证书
+--installer-sign <identity>  Developer ID Installer 证书
+--notary-profile <profile>   notarytool keychain profile 名称
+--notarize                   提交公证并 staple
 ```
 
-### 图标说明
+### 3) 图标说明
 
-- 默认会读取 `assets/AppIcon.icns`。
-- 也可以通过 `ICON_ICNS_PATH` 或 `--icon-icns` 指定其它 `.icns` 文件。
+- 默认读取 `assets/AppIcon.icns`。
+- 可通过 `.env` 中的 `ICON_ICNS_PATH` 或 `--icon-icns` 指定其它路径。
 
 ### 4) 产物位置
 
 - App Bundle: `dist/PerfMonitor.app`
 - Installer: `dist/PerfMonitor-<VERSION>.pkg`
+- Appcast:   `dist/appcast.xml`（配置 Sparkle 后自动生成）
 
 ### 5) 验证安装包
 
@@ -197,6 +201,7 @@ security find-identity -v -p basic
 
 ## 注意事项
 
-- `.env` 已加入 `.gitignore`，不要提交证书信息。
-- 如果只做本机测试，可不传签名参数，脚本会退回 ad-hoc 签名。
+- `.env` 已加入 `.gitignore`，不要提交证书信息或 Sparkle 私钥。
+- 如果只做本机测试，可不配置签名参数，脚本会退回 ad-hoc 签名。
 - 对外分发建议始终走“签名 + 公证 + staple”。
+- 旧版 README 里的 `set -a; source .env; set +a` 步骤**不再需要**，脚本会自动处理。

@@ -6,6 +6,7 @@ struct PerfMonitorApp: App {
     @StateObject private var viewModel = MetricsViewModel(provider: SystemMetricsProvider())
     @StateObject private var overlayCoordinator = OverlayCoordinator()
     @StateObject private var historyCoordinator = HistoryCoordinator()
+    @StateObject private var updaterViewModel = UpdaterViewModel()
 
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -13,7 +14,7 @@ struct PerfMonitorApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContentView(viewModel: viewModel)
+            MenuContentView(viewModel: viewModel, updaterViewModel: updaterViewModel)
                 .preferredColorScheme(viewModel.theme.colorScheme)
                 .onAppear {
                     overlayCoordinator.bind(viewModel: viewModel)
