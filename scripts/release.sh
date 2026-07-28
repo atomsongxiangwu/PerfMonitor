@@ -324,12 +324,57 @@ if [[ -n "$SIGN_UPDATE_TOOL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
     </channel>
 </rss>
 APPCAST
-    echo "    appcast.xml: $DIST_DIR/appcast.xml"
-    echo ""
-    echo "    Next steps:"
-    echo "      1. Create a GitHub Release tagged v${VERSION}"
-    echo "      2. Upload $PKG_PATH as a release asset"
-    echo "      3. Commit and push appcast.xml to your repo's main branch"
+    echo "    appcast.xml generated: $DIST_DIR/appcast.xml"
+
+    # ---- Auto-publish: GitHub Release + push appcast.xml ----
+    if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+      if [[ -n "$GITHUB_USER" ]]; then
+        RELEASE_TAG="v${VERSION}"
+        REPO_SLUG="${GITHUB_USER}/${GITHUB_REPO}"
+
+        echo ""
+        echo "==> Creating GitHub Release ${RELEASE_TAG}"
+        # Create release (--notes-from-tag uses tag annotation; falls back to empty notes).
+        if gh release view "$RELEASE_TAG" --repo "$REPO_SLUG" &>/dev/null 2>&1; then
+          echo "    Release ${RELEASE_TAG} already exists; uploading asset only"
+          gh release upload "$RELEASE_TAG" "$PKG_PATH" --repo "$REPO_SLUG" --clobber
+        else
+          gh release create "$RELEASE_TAG" "$PKG_PATH" \
+            --repo "$REPO_SLUG" \
+            --title "PerfMonitor ${VERSION}" \
+            --notes "Release ${VERSION}" \
+            --latest
+        fi
+        echo "    Release asset uploaded: $(basename "$PKG_PATH")"
+
+        echo ""
+        echo "==> Committing and pushing appcast.xml"
+        cd "$ROOT_DIR"
+        cp "$DIST_DIR/appcast.xml" "$ROOT_DIR/appcast.xml"
+        git add appcast.xml
+        if git diff --cached --quiet; then
+          echo "    appcast.xml unchanged; no commit needed"
+        else
+          git commit -m "chore: update appcast for ${RELEASE_TAG}"
+          git push
+          echo "    appcast.xml pushed to main branch"
+        fi
+      else
+        echo ""
+        echo "    Skipping auto-publish: set GITHUB_USER in .env to enable"
+        echo "    Manual steps:"
+        echo "      1. Create GitHub Release tagged v${VERSION}"
+        echo "      2. Upload $PKG_PATH as a release asset"
+        echo "      3. cp $DIST_DIR/appcast.xml appcast.xml && git add appcast.xml && git commit -m 'chore: appcast v${VERSION}' && git push"
+      fi
+    else
+      echo ""
+      echo "    GitHub CLI not configured; run: gh auth login"
+      echo "    Manual steps:"
+      echo "      1. Create GitHub Release tagged v${VERSION}"
+      echo "      2. Upload $PKG_PATH as a release asset"
+      echo "      3. cp $DIST_DIR/appcast.xml appcast.xml && git add appcast.xml && git commit -m 'chore: appcast v${VERSION}' && git push"
+    fi
   fi
 elif [[ -z "$SIGN_UPDATE_TOOL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
   echo "==> sign_update tool not found; skipping appcast generation"

@@ -112,9 +112,30 @@ swift run
 
 项目已内置自动化脚本：`scripts/release.sh`
 
-### 1) 准备 `.env`
+### 首次配置（只做一次）
 
-`.env` 已创建在项目根目录，填写你的证书、profile 和 Sparkle 配置：
+#### 1) 登录 GitHub CLI
+
+```bash
+gh auth login
+# 选择 GitHub.com → HTTPS → Login with a web browser
+```
+
+#### 2) 创建 GitHub 仓库并推送代码
+
+```bash
+cd /Users/bytedance/code/demo/PerfMonitor
+gh repo create PerfMonitor --public --description "macOS menubar performance monitor" --source=. --push
+```
+
+#### 3) 初始化 Sparkle 签名密钥
+
+```bash
+bash scripts/setup-sparkle.sh
+# 按输出提示把 SPARKLE_PUBLIC_KEY、SPARKLE_TOOLS_DIR 填入 .env
+```
+
+#### 4) 完善 `.env`
 
 ```bash
 VERSION="0.1.2"
@@ -125,29 +146,36 @@ ICON_ICNS_PATH="assets/AppIcon.icns"
 NOTARY_PROFILE="AC_PROFILE"
 NOTARIZE="1"
 
-# Sparkle 自动更新（首次运行 scripts/setup-sparkle.sh 生成后填入）
+# Sparkle（由 setup-sparkle.sh 生成后填入）
 SPARKLE_PUBLIC_KEY="..."
 SPARKLE_TOOLS_DIR="/Users/you/.sparkle-tools/bin"
-GITHUB_USER="your_github_username"
+GITHUB_USER="your_github_username"   # ← 填你的 GitHub 用户名
 GITHUB_REPO="PerfMonitor"
 ```
 
-### 2) 执行打包
+---
 
-脚本会**自动读取 `.env`**，直接运行即可，无需手动 `source` 或传参：
+### 日常发版（一条命令搞定）
 
 ```bash
 ./scripts/release.sh
 ```
 
-脚本会依次完成：编译 → 创建 .app → 嵌入 Sparkle.framework → 签名 → 打 .pkg → 公证 → 生成 appcast.xml。
+脚本会**全自动**依次完成：
+
+1. 编译 Release 二进制
+2. 创建 .app Bundle，嵌入 Sparkle.framework
+3. 代码签名
+4. 打 .pkg 安装包
+5. 公证 + Staple
+6. 生成签名的 `appcast.xml`
+7. **自动在 GitHub 创建 Release 并上传 .pkg**
+8. **自动将 `appcast.xml` commit 并 push 到主分支**
 
 #### 临时覆盖某个参数（可选）
 
-如需临时指定不同的版本号或证书，可用命令行参数覆盖 `.env` 里的值：
-
 ```bash
-./scripts/release.sh --version 1.2.0 --notarize
+./scripts/release.sh --version 1.2.0
 ```
 
 完整参数列表：
@@ -162,16 +190,11 @@ GITHUB_REPO="PerfMonitor"
 --notarize                   提交公证并 staple
 ```
 
-### 3) 图标说明
-
-- 默认读取 `assets/AppIcon.icns`。
-- 可通过 `.env` 中的 `ICON_ICNS_PATH` 或 `--icon-icns` 指定其它路径。
-
-### 4) 产物位置
+### 产物位置
 
 - App Bundle: `dist/PerfMonitor.app`
-- Installer: `dist/PerfMonitor-<VERSION>.pkg`
-- Appcast:   `dist/appcast.xml`（配置 Sparkle 后自动生成）
+- Installer:  `dist/PerfMonitor-<VERSION>.pkg`
+- Appcast:    `dist/appcast.xml`（同时自动 push 到仓库根目录）
 
 ### 5) 验证安装包
 
