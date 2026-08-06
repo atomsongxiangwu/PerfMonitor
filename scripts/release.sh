@@ -22,6 +22,11 @@ fi
 
 APP_NAME="${APP_NAME:-PerfMonitor}"
 VERSION="${VERSION:-0.1.0}"
+APP_VERSION="${VERSION#v}"
+RELEASE_TAG="${VERSION}"
+if [[ "$RELEASE_TAG" != v* ]]; then
+  RELEASE_TAG="v${RELEASE_TAG}"
+fi
 BUNDLE_ID="${BUNDLE_ID:-com.yourcompany.perfmonitor}"
 MIN_MACOS_VERSION="${MIN_MACOS_VERSION:-13.0}"
 ICON_ICNS_PATH="${ICON_ICNS_PATH:-}"
@@ -44,7 +49,7 @@ DIST_DIR="$ROOT_DIR/dist"
 BUILD_DIR="$ROOT_DIR/.build/release"
 APP_DIR="$DIST_DIR/${APP_NAME}.app"
 PKG_ROOT="$DIST_DIR/pkgroot"
-PKG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}.pkg"
+PKG_PATH="$DIST_DIR/${APP_NAME}-${APP_VERSION}.pkg"
 DEFAULT_ICON_PATH="$ROOT_DIR/assets/AppIcon.icns"
 
 usage() {
@@ -73,7 +78,13 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version)
-      VERSION="$2"; shift 2 ;;
+      VERSION="$2"
+      APP_VERSION="${VERSION#v}"
+      RELEASE_TAG="${VERSION}"
+      if [[ "$RELEASE_TAG" != v* ]]; then
+        RELEASE_TAG="v${RELEASE_TAG}"
+      fi
+      shift 2 ;;
     --bundle-id)
       BUNDLE_ID="$2"; shift 2 ;;
     --icon-icns)
@@ -96,7 +107,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Recompute pkg path in case --version overrides env/default.
-PKG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}.pkg"
+PKG_PATH="$DIST_DIR/${APP_NAME}-${APP_VERSION}.pkg"
 
 # Derive APPCAST_URL from GitHub info if not explicitly set.
 if [[ -z "$APPCAST_URL" && -n "$GITHUB_USER" ]]; then
@@ -199,8 +210,8 @@ cat > "$INFO_PLIST" <<PLIST_HEAD
   <key>CFBundleName</key><string>${APP_NAME}</string>
   <key>CFBundleDisplayName</key><string>${APP_NAME}</string>
   <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
-  <key>CFBundleVersion</key><string>${VERSION}</string>
-  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>${APP_VERSION}</string>
+  <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
   <key>CFBundleExecutable</key><string>${APP_NAME}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
 PLIST_HEAD
@@ -249,7 +260,7 @@ if [[ -n "$INSTALLER_SIGN_IDENTITY" ]]; then
   pkgbuild \
     --root "$PKG_ROOT" \
     --identifier "$BUNDLE_ID" \
-    --version "$VERSION" \
+    --version "$APP_VERSION" \
     --install-location / \
     --sign "$INSTALLER_SIGN_IDENTITY" \
     "$PKG_PATH"
@@ -257,7 +268,7 @@ else
   pkgbuild \
     --root "$PKG_ROOT" \
     --identifier "$BUNDLE_ID" \
-    --version "$VERSION" \
+    --version "$APP_VERSION" \
     --install-location / \
     "$PKG_PATH"
 fi
@@ -306,7 +317,7 @@ if [[ -n "$SIGN_UPDATE_TOOL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
     echo "    $SIGN_OUTPUT"
   else
     PUBDATE=$(date -u '+%a, %d %b %Y %H:%M:%S +0000')
-    PKG_DOWNLOAD_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/releases/download/v${VERSION}/${APP_NAME}-${VERSION}.pkg"
+    PKG_DOWNLOAD_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/releases/download/${RELEASE_TAG}/${APP_NAME}-${APP_VERSION}.pkg"
 
     cat > "$DIST_DIR/appcast.xml" <<APPCAST
 <?xml version="1.0" encoding="utf-8"?>
@@ -319,9 +330,9 @@ if [[ -n "$SIGN_UPDATE_TOOL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
         <description>${APP_NAME} release history</description>
         <language>en</language>
         <item>
-            <title>Version ${VERSION}</title>
-            <sparkle:version>${VERSION}</sparkle:version>
-            <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+            <title>Version ${APP_VERSION}</title>
+            <sparkle:version>${APP_VERSION}</sparkle:version>
+            <sparkle:shortVersionString>${APP_VERSION}</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>${MIN_MACOS_VERSION}</sparkle:minimumSystemVersion>
             <pubDate>${PUBDATE}</pubDate>
             <enclosure
@@ -338,7 +349,6 @@ APPCAST
     # ---- Auto-publish: GitHub Release + push appcast.xml ----
     if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
       if [[ -n "$GITHUB_USER" ]]; then
-        RELEASE_TAG="v${VERSION}"
         REPO_SLUG="${GITHUB_USER}/${GITHUB_REPO}"
 
         echo ""
@@ -350,8 +360,8 @@ APPCAST
         else
           gh release create "$RELEASE_TAG" "$PKG_PATH" \
             --repo "$REPO_SLUG" \
-            --title "PerfMonitor ${VERSION}" \
-            --notes "Release ${VERSION}" \
+            --title "PerfMonitor ${APP_VERSION}" \
+            --notes "Release ${APP_VERSION}" \
             --latest
         fi
         echo "    Release asset uploaded: $(basename "$PKG_PATH")"
@@ -372,17 +382,17 @@ APPCAST
         echo ""
         echo "    Skipping auto-publish: set GITHUB_USER in .env to enable"
         echo "    Manual steps:"
-        echo "      1. Create GitHub Release tagged v${VERSION}"
+        echo "      1. Create GitHub Release tagged ${RELEASE_TAG}"
         echo "      2. Upload $PKG_PATH as a release asset"
-        echo "      3. cp $DIST_DIR/appcast.xml appcast.xml && git add appcast.xml && git commit -m 'chore: appcast v${VERSION}' && git push"
+        echo "      3. cp $DIST_DIR/appcast.xml appcast.xml && git add appcast.xml && git commit -m 'chore: appcast ${RELEASE_TAG}' && git push"
       fi
     else
       echo ""
       echo "    GitHub CLI not configured; run: gh auth login"
       echo "    Manual steps:"
-      echo "      1. Create GitHub Release tagged v${VERSION}"
+      echo "      1. Create GitHub Release tagged ${RELEASE_TAG}"
       echo "      2. Upload $PKG_PATH as a release asset"
-      echo "      3. cp $DIST_DIR/appcast.xml appcast.xml && git add appcast.xml && git commit -m 'chore: appcast v${VERSION}' && git push"
+      echo "      3. cp $DIST_DIR/appcast.xml appcast.xml && git add appcast.xml && git commit -m 'chore: appcast ${RELEASE_TAG}' && git push"
     fi
   fi
 elif [[ -z "$SIGN_UPDATE_TOOL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
