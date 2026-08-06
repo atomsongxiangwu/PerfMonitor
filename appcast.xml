@@ -12,11 +12,11 @@
             <sparkle:version>0.1.4</sparkle:version>
             <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <pubDate>Tue, 28 Jul 2026 13:28:29 +0000</pubDate>
+            <pubDate>Thu, 06 Aug 2026 03:13:01 +0000</pubDate>
             <enclosure
                 url="https://github.com/atomsongxiangwu/PerfMonitor/releases/download/v0.1.4/PerfMonitor-0.1.4.pkg"
-                sparkle:edSignature="3dNfYDzI9LSsM799dBAJV7H0mKprVY11Nob6vne47J9IKrZZQ3i7W21246J51UML9hUNcmV6d6q4XQzk5kR5Cw=="
-                length="1726709"
+                sparkle:edSignature="L099J2JUs404/e9rWk2Dj3pDud+wfFM60wQAeKSa0vuubWYDmaEZR+91yJgdT6i+K5/lwD70UkBbW340jc/NDA=="
+                length="1862625"
                 type="application/octet-stream"/>
         </item>
     </channel>
