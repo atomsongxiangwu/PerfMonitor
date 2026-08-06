@@ -283,7 +283,7 @@ struct MenuContentView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(!updaterViewModel.canCheckForUpdates)
+                .disabled(!updaterViewModel.isUpdaterAvailable)
             }
         }
     }
