@@ -61,8 +61,80 @@ struct MetricsSnapshot: Codable {
     let downloadBytesPerSecond: Double
     let diskReadBytesPerSecond: Double
     let diskWriteBytesPerSecond: Double
+    let diskUsedBytes: UInt64
+    let diskTotalBytes: UInt64
     let fps: Double
     let sampledAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case cpuUsagePercent
+        case memoryUsedBytes
+        case memoryTotalBytes
+        case uploadBytesPerSecond
+        case downloadBytesPerSecond
+        case diskReadBytesPerSecond
+        case diskWriteBytesPerSecond
+        case diskUsedBytes
+        case diskTotalBytes
+        case fps
+        case sampledAt
+    }
+
+    init(
+        cpuUsagePercent: Double,
+        memoryUsedBytes: UInt64,
+        memoryTotalBytes: UInt64,
+        uploadBytesPerSecond: Double,
+        downloadBytesPerSecond: Double,
+        diskReadBytesPerSecond: Double,
+        diskWriteBytesPerSecond: Double,
+        diskUsedBytes: UInt64,
+        diskTotalBytes: UInt64,
+        fps: Double,
+        sampledAt: Date
+    ) {
+        self.cpuUsagePercent = cpuUsagePercent
+        self.memoryUsedBytes = memoryUsedBytes
+        self.memoryTotalBytes = memoryTotalBytes
+        self.uploadBytesPerSecond = uploadBytesPerSecond
+        self.downloadBytesPerSecond = downloadBytesPerSecond
+        self.diskReadBytesPerSecond = diskReadBytesPerSecond
+        self.diskWriteBytesPerSecond = diskWriteBytesPerSecond
+        self.diskUsedBytes = diskUsedBytes
+        self.diskTotalBytes = diskTotalBytes
+        self.fps = fps
+        self.sampledAt = sampledAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        cpuUsagePercent = try c.decodeIfPresent(Double.self, forKey: .cpuUsagePercent) ?? 0
+        memoryUsedBytes = try c.decodeIfPresent(UInt64.self, forKey: .memoryUsedBytes) ?? 0
+        memoryTotalBytes = try c.decodeIfPresent(UInt64.self, forKey: .memoryTotalBytes) ?? ProcessInfo.processInfo.physicalMemory
+        uploadBytesPerSecond = try c.decodeIfPresent(Double.self, forKey: .uploadBytesPerSecond) ?? 0
+        downloadBytesPerSecond = try c.decodeIfPresent(Double.self, forKey: .downloadBytesPerSecond) ?? 0
+        diskReadBytesPerSecond = try c.decodeIfPresent(Double.self, forKey: .diskReadBytesPerSecond) ?? 0
+        diskWriteBytesPerSecond = try c.decodeIfPresent(Double.self, forKey: .diskWriteBytesPerSecond) ?? 0
+        diskUsedBytes = try c.decodeIfPresent(UInt64.self, forKey: .diskUsedBytes) ?? 0
+        diskTotalBytes = try c.decodeIfPresent(UInt64.self, forKey: .diskTotalBytes) ?? 0
+        fps = try c.decodeIfPresent(Double.self, forKey: .fps) ?? 0
+        sampledAt = try c.decodeIfPresent(Date.self, forKey: .sampledAt) ?? Date()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(cpuUsagePercent, forKey: .cpuUsagePercent)
+        try c.encode(memoryUsedBytes, forKey: .memoryUsedBytes)
+        try c.encode(memoryTotalBytes, forKey: .memoryTotalBytes)
+        try c.encode(uploadBytesPerSecond, forKey: .uploadBytesPerSecond)
+        try c.encode(downloadBytesPerSecond, forKey: .downloadBytesPerSecond)
+        try c.encode(diskReadBytesPerSecond, forKey: .diskReadBytesPerSecond)
+        try c.encode(diskWriteBytesPerSecond, forKey: .diskWriteBytesPerSecond)
+        try c.encode(diskUsedBytes, forKey: .diskUsedBytes)
+        try c.encode(diskTotalBytes, forKey: .diskTotalBytes)
+        try c.encode(fps, forKey: .fps)
+        try c.encode(sampledAt, forKey: .sampledAt)
+    }
 
     static let empty = MetricsSnapshot(
         cpuUsagePercent: 0,
@@ -72,6 +144,8 @@ struct MetricsSnapshot: Codable {
         downloadBytesPerSecond: 0,
         diskReadBytesPerSecond: 0,
         diskWriteBytesPerSecond: 0,
+        diskUsedBytes: 0,
+        diskTotalBytes: 0,
         fps: 0,
         sampledAt: Date()
     )
@@ -108,6 +182,9 @@ final class MetricsViewModel: ObservableObject {
     @Published var memoryAlertThresholdPercent = 85.0 {
         didSet { persist(memoryAlertThresholdPercent, forKey: Keys.memoryAlertThreshold) }
     }
+    @Published var diskAlertThresholdPercent = 85.0 {
+        didSet { persist(diskAlertThresholdPercent, forKey: Keys.diskAlertThreshold) }
+    }
     @Published var networkAlertThresholdMBps = 20.0 {
         didSet { persist(networkAlertThresholdMBps, forKey: Keys.networkAlertThreshold) }
     }
@@ -134,14 +211,23 @@ final class MetricsViewModel: ObservableObject {
     @Published var overlayOpacity: Double { didSet { persist(overlayOpacity, forKey: Keys.overlayOpacity) } }
 
     @Published var historyWindowVisible = false
+    @Published var diskCleanupWindowVisible = false
     @Published var importError: String?
     @Published var historyExportError: String?
+    @Published private(set) var diskCleanupItems: [DiskCleanupItem] = []
+    @Published private(set) var diskCleanupIsScanning = false
+    @Published private(set) var diskCleanupCleaningCategories: Set<DiskCleanupCategory> = []
+    @Published private(set) var diskCleanupLastScannedAt: Date?
+    @Published var diskCleanupMessage: String?
+    @Published var diskCleanupError: String?
+    @Published private(set) var diskCleanupSelectedCandidateIDs: Set<String> = []
 
     @Published var topProcessSortKey: ProcessSortKey = .cpu {
         didSet { topProcesses = processSampler.sample(topN: 5, sortBy: topProcessSortKey) }
     }
 
     private let provider: SystemMetricsProvider
+    private let diskCleanupService = DiskCleanupService()
     private let processSampler = ProcessSampler()
     private let preferencesStore = PreferencesStore()
     private let historyStore = HistoryStore(retentionDays: 7)
@@ -167,6 +253,7 @@ final class MetricsViewModel: ObservableObject {
         static let showMenuBarUpload = "showMenuBarUpload"
         static let cpuAlertThreshold = "cpuAlertThresholdPercent"
         static let memoryAlertThreshold = "memoryAlertThresholdPercent"
+        static let diskAlertThreshold = "diskAlertThresholdPercent"
         static let networkAlertThreshold = "networkAlertThresholdMBps"
         static let notificationsEnabled = "notificationsEnabled"
         static let theme = "theme"
@@ -204,6 +291,7 @@ final class MetricsViewModel: ObservableObject {
                 showMenuBarUpload: userDefaults.object(forKey: Keys.showMenuBarUpload) as? Bool ?? false,
                 cpuAlertThresholdPercent: userDefaults.object(forKey: Keys.cpuAlertThreshold) as? Double ?? 85,
                 memoryAlertThresholdPercent: userDefaults.object(forKey: Keys.memoryAlertThreshold) as? Double ?? 85,
+                diskAlertThresholdPercent: userDefaults.object(forKey: Keys.diskAlertThreshold) as? Double ?? 85,
                 networkAlertThresholdMBps: userDefaults.object(forKey: Keys.networkAlertThreshold) as? Double ?? 20,
                 notificationsEnabled: userDefaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? false,
                 theme: userDefaults.string(forKey: Keys.theme) ?? AppTheme.system.rawValue,
@@ -228,6 +316,7 @@ final class MetricsViewModel: ObservableObject {
         showMenuBarUpload = settings.showMenuBarUpload
         cpuAlertThresholdPercent = settings.cpuAlertThresholdPercent
         memoryAlertThresholdPercent = settings.memoryAlertThresholdPercent
+        diskAlertThresholdPercent = settings.diskAlertThresholdPercent
         networkAlertThresholdMBps = settings.networkAlertThresholdMBps
         notificationsEnabled = settings.notificationsEnabled
         theme = AppTheme(rawValue: settings.theme) ?? .system
@@ -257,6 +346,11 @@ final class MetricsViewModel: ObservableObject {
         guard snapshot.memoryTotalBytes > 0 else { return false }
         let percent = Double(snapshot.memoryUsedBytes) / Double(snapshot.memoryTotalBytes) * 100
         return percent >= memoryAlertThresholdPercent
+    }
+
+    func isDiskSpaceAlerting(for snapshot: MetricsSnapshot) -> Bool {
+        let percent = MetricFormatting.diskUsagePercent(used: snapshot.diskUsedBytes, total: snapshot.diskTotalBytes)
+        return percent >= diskAlertThresholdPercent
     }
 
     func isUploadAlerting(for snapshot: MetricsSnapshot) -> Bool {
@@ -332,6 +426,114 @@ final class MetricsViewModel: ObservableObject {
         try preferencesStore.exportData(currentPreferences)
     }
 
+    func refreshDiskCleanupItems() {
+        guard !diskCleanupIsScanning else { return }
+        diskCleanupIsScanning = true
+        diskCleanupError = nil
+
+        Task {
+            let items = await diskCleanupService.scanItems()
+            diskCleanupItems = items
+            pruneDiskCleanupSelection(using: items)
+            diskCleanupLastScannedAt = Date()
+            diskCleanupIsScanning = false
+        }
+    }
+
+    func cleanDiskCleanupCategory(_ category: DiskCleanupCategory) {
+        guard !diskCleanupCleaningCategories.contains(category) else { return }
+        diskCleanupError = nil
+        diskCleanupMessage = nil
+        diskCleanupCleaningCategories.insert(category)
+
+        Task {
+            do {
+                let result = try await diskCleanupService.clean(category: category)
+                let items = await diskCleanupService.scanItems()
+                diskCleanupItems = items
+                pruneDiskCleanupSelection(using: items)
+                diskCleanupLastScannedAt = Date()
+                diskCleanupMessage = result.freedBytes > 0
+                    ? "Freed \(MetricFormatting.bytes(result.freedBytes)) from \(category.title)"
+                    : "No removable files found in \(category.title)"
+                if !result.failedPaths.isEmpty {
+                    diskCleanupError = "Failed to remove \(result.failedPaths.count) item(s) from \(category.title)"
+                }
+            } catch {
+                diskCleanupError = "Cleanup failed for \(category.title): \(error.localizedDescription)"
+            }
+
+            diskCleanupCleaningCategories.remove(category)
+        }
+    }
+
+    func toggleDiskCleanupCandidate(_ candidate: DiskCleanupCandidate) {
+        if diskCleanupSelectedCandidateIDs.contains(candidate.id) {
+            diskCleanupSelectedCandidateIDs.remove(candidate.id)
+        } else {
+            diskCleanupSelectedCandidateIDs.insert(candidate.id)
+        }
+    }
+
+    func setDiskCleanupSelection(_ isSelected: Bool, candidates: [DiskCleanupCandidate]) {
+        let ids = candidates.map(\.id)
+        if isSelected {
+            diskCleanupSelectedCandidateIDs.formUnion(ids)
+        } else {
+            diskCleanupSelectedCandidateIDs.subtract(ids)
+        }
+    }
+
+    func isDiskCleanupCandidateSelected(_ candidate: DiskCleanupCandidate) -> Bool {
+        diskCleanupSelectedCandidateIDs.contains(candidate.id)
+    }
+
+    func selectedDiskCleanupCandidates(for item: DiskCleanupItem) -> [DiskCleanupCandidate] {
+        item.topCandidates.filter { diskCleanupSelectedCandidateIDs.contains($0.id) }
+    }
+
+    func cleanSelectedDiskCleanupCandidates(in item: DiskCleanupItem) {
+        let candidates = selectedDiskCleanupCandidates(for: item)
+        guard !candidates.isEmpty else { return }
+
+        let category = item.category
+        diskCleanupError = nil
+        diskCleanupMessage = nil
+        diskCleanupCleaningCategories.insert(category)
+
+        Task {
+            do {
+                let result = try await diskCleanupService.clean(
+                    category: category,
+                    candidatePaths: candidates.map(\.path)
+                )
+                let items = await diskCleanupService.scanItems()
+                diskCleanupItems = items
+                pruneDiskCleanupSelection(using: items)
+                diskCleanupLastScannedAt = Date()
+                diskCleanupMessage = result.freedBytes > 0
+                    ? "Freed \(MetricFormatting.bytes(result.freedBytes)) from \(result.cleanedPaths.count) selected item(s)"
+                    : "No selected items were removed"
+                if !result.failedPaths.isEmpty {
+                    diskCleanupError = "Failed to remove \(result.failedPaths.count) selected item(s)"
+                }
+            } catch {
+                diskCleanupError = "Cleanup failed for selected items: \(error.localizedDescription)"
+            }
+
+            diskCleanupCleaningCategories.remove(category)
+        }
+    }
+
+    func isCleaningDiskCategory(_ category: DiskCleanupCategory) -> Bool {
+        diskCleanupCleaningCategories.contains(category)
+    }
+
+    private func pruneDiskCleanupSelection(using items: [DiskCleanupItem]) {
+        let validIDs = Set(items.flatMap { $0.topCandidates.map(\.id) })
+        diskCleanupSelectedCandidateIDs = diskCleanupSelectedCandidateIDs.intersection(validIDs)
+    }
+
     func importSettings(from data: Data) {
         do {
             let settings = try preferencesStore.decode(data)
@@ -364,6 +566,7 @@ final class MetricsViewModel: ObservableObject {
             showMenuBarUpload: showMenuBarUpload,
             cpuAlertThresholdPercent: cpuAlertThresholdPercent,
             memoryAlertThresholdPercent: memoryAlertThresholdPercent,
+            diskAlertThresholdPercent: diskAlertThresholdPercent,
             networkAlertThresholdMBps: networkAlertThresholdMBps,
             notificationsEnabled: notificationsEnabled,
             theme: theme.rawValue,
@@ -385,6 +588,7 @@ final class MetricsViewModel: ObservableObject {
         showMenuBarUpload = s.showMenuBarUpload
         cpuAlertThresholdPercent = s.cpuAlertThresholdPercent
         memoryAlertThresholdPercent = s.memoryAlertThresholdPercent
+        diskAlertThresholdPercent = s.diskAlertThresholdPercent
         networkAlertThresholdMBps = s.networkAlertThresholdMBps
         notificationsEnabled = s.notificationsEnabled
         theme = AppTheme(rawValue: s.theme) ?? .system
@@ -461,6 +665,12 @@ final class MetricsViewModel: ObservableObject {
             isTriggered: isMemoryAlerting(for: snapshot),
             title: "Memory usage alert",
             body: String(format: "Memory reached %.1f%%", memPct)
+        )
+        processAlert(
+            key: "disk",
+            isTriggered: isDiskSpaceAlerting(for: snapshot),
+            title: "Disk space alert",
+            body: String(format: "Disk usage reached %.1f%%", MetricFormatting.diskUsagePercent(used: snapshot.diskUsedBytes, total: snapshot.diskTotalBytes))
         )
         processAlert(
             key: "download",

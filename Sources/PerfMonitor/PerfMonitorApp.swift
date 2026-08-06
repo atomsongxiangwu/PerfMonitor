@@ -6,6 +6,7 @@ struct PerfMonitorApp: App {
     @StateObject private var viewModel = MetricsViewModel(provider: SystemMetricsProvider())
     @StateObject private var overlayCoordinator = OverlayCoordinator()
     @StateObject private var historyCoordinator = HistoryCoordinator()
+    @StateObject private var diskCleanupCoordinator = DiskCleanupCoordinator()
     @StateObject private var updaterViewModel = UpdaterViewModel()
 
     init() {
@@ -19,6 +20,7 @@ struct PerfMonitorApp: App {
                 .onAppear {
                     overlayCoordinator.bind(viewModel: viewModel)
                     historyCoordinator.bind(viewModel: viewModel)
+                    diskCleanupCoordinator.bind(viewModel: viewModel)
                 }
         } label: {
             HStack(spacing: 4) {

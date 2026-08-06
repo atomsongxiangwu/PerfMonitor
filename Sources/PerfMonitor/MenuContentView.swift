@@ -89,6 +89,7 @@ struct MenuContentView: View {
                     }
 
                     if viewModel.showDisk {
+                        diskSpaceCard
                         metricRow(
                             "Disk Read",
                             value: "\(MetricFormatting.speed(viewModel.snapshot.diskReadBytesPerSecond))/s",
@@ -212,6 +213,7 @@ struct MenuContentView: View {
         section("Alert Thresholds") {
             thresholdRow("CPU", value: $viewModel.cpuAlertThresholdPercent, range: 50...100, format: "%.0f%%")
             thresholdRow("Memory", value: $viewModel.memoryAlertThresholdPercent, range: 50...100, format: "%.0f%%")
+            thresholdRow("Disk", value: $viewModel.diskAlertThresholdPercent, range: 50...100, format: "%.0f%%")
             thresholdRow("Network", value: $viewModel.networkAlertThresholdMBps, range: 1...500, format: "%.0f MB/s")
             Toggle("Desktop Notifications", isOn: $viewModel.notificationsEnabled)
         }
@@ -386,6 +388,111 @@ struct MenuContentView: View {
             .frame(height: 28)
             .background(.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    private var diskSpaceCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Disk Space")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Button {
+                    viewModel.diskCleanupWindowVisible = true
+                } label: {
+                    Label("Details", systemImage: "chevron.right")
+                        .font(.caption2)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .padding(.trailing, 4)
+
+                Text(String(format: "%.1f%%", MetricFormatting.diskUsagePercent(
+                    used: viewModel.snapshot.diskUsedBytes,
+                    total: viewModel.snapshot.diskTotalBytes
+                )))
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(diskUsageColor)
+            }
+
+            Text(diskUsageStatusText)
+                .font(.caption2)
+                .foregroundStyle(diskUsageColor)
+
+            diskSpaceUsageBar
+
+            HStack(spacing: 10) {
+                diskSpaceCell(title: "Used", value: MetricFormatting.bytes(viewModel.snapshot.diskUsedBytes), accent: .orange)
+                diskSpaceCell(title: "Free", value: MetricFormatting.bytes(max(viewModel.snapshot.diskTotalBytes - viewModel.snapshot.diskUsedBytes, 0)), accent: .green)
+                diskSpaceCell(title: "Total", value: MetricFormatting.bytes(viewModel.snapshot.diskTotalBytes), accent: .blue)
+            }
+        }
+        .padding(10)
+        .background(.gray.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var diskUsagePercent: Double {
+        MetricFormatting.diskUsagePercent(used: viewModel.snapshot.diskUsedBytes, total: viewModel.snapshot.diskTotalBytes)
+    }
+
+    private var diskFreePercent: Double {
+        max(0, 100 - diskUsagePercent)
+    }
+
+    private var diskSpaceUsageBar: some View {
+        GeometryReader { geo in
+            let usedWidth = geo.size.width * (diskUsagePercent / 100)
+            let freeWidth = geo.size.width * (diskFreePercent / 100)
+
+            HStack(spacing: 0) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.orange)
+                    .frame(width: max(0, usedWidth))
+
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.green.opacity(0.85))
+                    .frame(width: max(0, freeWidth))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .frame(height: 12)
+    }
+
+    private var diskUsageColor: Color {
+        if viewModel.isDiskSpaceAlerting(for: viewModel.snapshot) {
+            return .red
+        }
+        if diskUsagePercent >= 70 {
+            return .orange
+        }
+        return .green
+    }
+
+    private var diskUsageStatusText: String {
+        if viewModel.isDiskSpaceAlerting(for: viewModel.snapshot) {
+            return "Low free space"
+        }
+        if diskUsagePercent >= 70 {
+            return "Monitor closely"
+        }
+        return "Healthy"
+    }
+
+    private func diskSpaceCell(title: String, value: String, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(accent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var diskReadTrend: [Double] { viewModel.history.map(\.diskReadBytesPerSecond) }

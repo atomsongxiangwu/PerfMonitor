@@ -12,6 +12,7 @@ struct AppSettings: Codable {
     var showMenuBarUpload: Bool
     var cpuAlertThresholdPercent: Double
     var memoryAlertThresholdPercent: Double
+    var diskAlertThresholdPercent: Double
     var networkAlertThresholdMBps: Double
     var notificationsEnabled: Bool
     var theme: String
@@ -31,6 +32,7 @@ struct AppSettings: Codable {
         case showMenuBarUpload
         case cpuAlertThresholdPercent
         case memoryAlertThresholdPercent
+        case diskAlertThresholdPercent
         case networkAlertThresholdMBps
         case notificationsEnabled
         case theme
@@ -51,6 +53,7 @@ struct AppSettings: Codable {
         showMenuBarUpload: Bool,
         cpuAlertThresholdPercent: Double,
         memoryAlertThresholdPercent: Double,
+        diskAlertThresholdPercent: Double,
         networkAlertThresholdMBps: Double,
         notificationsEnabled: Bool,
         theme: String,
@@ -69,6 +72,7 @@ struct AppSettings: Codable {
         self.showMenuBarUpload = showMenuBarUpload
         self.cpuAlertThresholdPercent = cpuAlertThresholdPercent
         self.memoryAlertThresholdPercent = memoryAlertThresholdPercent
+        self.diskAlertThresholdPercent = diskAlertThresholdPercent
         self.networkAlertThresholdMBps = networkAlertThresholdMBps
         self.notificationsEnabled = notificationsEnabled
         self.theme = theme
@@ -90,6 +94,7 @@ struct AppSettings: Codable {
         showMenuBarUpload = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarUpload) ?? false
         cpuAlertThresholdPercent = try c.decodeIfPresent(Double.self, forKey: .cpuAlertThresholdPercent) ?? 85
         memoryAlertThresholdPercent = try c.decodeIfPresent(Double.self, forKey: .memoryAlertThresholdPercent) ?? 85
+        diskAlertThresholdPercent = try c.decodeIfPresent(Double.self, forKey: .diskAlertThresholdPercent) ?? 85
         networkAlertThresholdMBps = try c.decodeIfPresent(Double.self, forKey: .networkAlertThresholdMBps) ?? 20
         notificationsEnabled = try c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? false
         theme = try c.decodeIfPresent(String.self, forKey: .theme) ?? AppTheme.system.rawValue
@@ -111,6 +116,7 @@ struct AppSettings: Codable {
             showMenuBarUpload: false,
             cpuAlertThresholdPercent: 85,
             memoryAlertThresholdPercent: 85,
+            diskAlertThresholdPercent: 85,
             networkAlertThresholdMBps: 20,
             notificationsEnabled: false,
             theme: AppTheme.system.rawValue,

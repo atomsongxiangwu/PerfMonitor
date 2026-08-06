@@ -28,6 +28,7 @@ final class SystemMetricsProvider {
         let memory = sampleMemoryUsage()
         let network = sampleNetworkRate()
         let disk = sampleDiskRate()
+        let diskSpace = sampleDiskSpace()
 
         return MetricsSnapshot(
             cpuUsagePercent: cpuUsage,
@@ -37,6 +38,8 @@ final class SystemMetricsProvider {
             downloadBytesPerSecond: network.download,
             diskReadBytesPerSecond: disk.read,
             diskWriteBytesPerSecond: disk.write,
+            diskUsedBytes: diskSpace.used,
+            diskTotalBytes: diskSpace.total,
             fps: refreshRateFPS,
             sampledAt: Date()
         )
@@ -172,6 +175,19 @@ private extension SystemMetricsProvider {
             read: Double(readDelta) / duration,
             write: Double(writeDelta) / duration
         )
+    }
+
+    func sampleDiskSpace() -> (used: UInt64, total: UInt64) {
+        guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: "/"),
+              let total = attrs[.systemSize] as? NSNumber,
+              let free = attrs[.systemFreeSize] as? NSNumber else {
+            return (0, 0)
+        }
+
+        let totalBytes = total.uint64Value
+        let freeBytes = free.uint64Value
+        let usedBytes = totalBytes > freeBytes ? totalBytes - freeBytes : 0
+        return (usedBytes, totalBytes)
     }
 
     func readNetworkCounters() -> NetworkCounters? {

@@ -14,6 +14,11 @@ enum MetricFormatting {
         return String(format: "%.0f (display)", fps)
     }
 
+    static func diskUsagePercent(used: UInt64, total: UInt64) -> Double {
+        guard total > 0 else { return 0 }
+        return min(max(Double(used) / Double(total) * 100, 0), 100)
+    }
+
     private static func byteFormatter() -> ByteCountFormatter {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useGB, .useMB, .useKB]

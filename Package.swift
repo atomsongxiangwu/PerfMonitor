@@ -26,5 +26,9 @@ let package = Package(
                 ),
             ]
         ),
+        .testTarget(
+            name: "PerfMonitorTests",
+            dependencies: ["PerfMonitor"]
+        ),
     ]
 )
