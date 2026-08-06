@@ -8,15 +8,15 @@
         <description>PerfMonitor release history</description>
         <language>en</language>
         <item>
-            <title>Version 0.1.5</title>
-            <sparkle:version>0.1.5</sparkle:version>
-            <sparkle:shortVersionString>0.1.5</sparkle:shortVersionString>
+            <title>Version 0.1.6</title>
+            <sparkle:version>0.1.6</sparkle:version>
+            <sparkle:shortVersionString>0.1.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <pubDate>Thu, 06 Aug 2026 03:50:38 +0000</pubDate>
+            <pubDate>Thu, 06 Aug 2026 12:22:30 +0000</pubDate>
             <enclosure
-                url="https://github.com/atomsongxiangwu/PerfMonitor/releases/download/v0.1.5/PerfMonitor-0.1.5.pkg"
-                sparkle:edSignature="E45zMaJg9ka/kJ8gcRLJTwS/lFa6aj8W3niTMDzGI5VKA0cT0mGUtpH+BN/84IE9Y9bujLkwfEGVGkau4nV1DQ=="
-                length="1862569"
+                url="https://github.com/atomsongxiangwu/PerfMonitor/releases/download/v0.1.6/PerfMonitor-0.1.6.pkg"
+                sparkle:edSignature="9vWF4n12o9Y6sTL/lLnzL3fazd7ilX+czrsIjJlJ6vOYxJYRHbjPSvvI7cEnR6w3JS3liYA2mPrqLkRk7if6Ag=="
+                length="1862553"
                 type="application/octet-stream"/>
         </item>
     </channel>
